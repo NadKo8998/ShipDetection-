@@ -27,7 +27,8 @@ TARGET_WIDTH = 128
 TARGET_HEIGHT = 128
 batch_size=16
 image_shape=(768, 768)
-
+img_scaling = (3, 3)
+count=900
 
 # Data Preparation
 train = os.listdir(image_path)
@@ -50,23 +51,23 @@ balanced_data = img_un.groupby('ships').apply(lambda s: s.sample(samples) if len
 train_set.drop(['ships'], axis=1, inplace=True)
 
 # Split the data into train and validation sets
-train_X,valid_Set = train_test_split(balanced_data, test_size=0.3, random_state=42,balanced_data['ships'])
-train_value = pd.merge(train_set, train_X)
-valid_value = pd.merge(train_set, valid_Set)
+train_X,valid_Set = train_test_split(balanced_data, test_size=0.3, random_state=42, stratify = balanced_data['ships'])
+
 
 
 #2.2 Split & Image generators
 train_ids, valid_ids = train_test_split(balanced_train_df, 
                  test_size = 0.2, 
                  stratify = balanced_train_df['ships'])
-train_df = pd.merge(masks, train_ids)
-valid_df = pd.merge(masks, valid_ids)
 
+train_value = merge(train_set, train_ids)
+valid_value = merge(train_set, valid_ids)
 
+# Generate train data 
                 
-train_gen = generators.make_image_gen(train_df)
+next_gen = dataGenerator(train_value)
 train_x, train_y = next(train_gen)
-valid_x, valid_y = next(generators.make_image_gen(valid_df, VALID_IMG_COUNT))
+valid_x, valid_y = next(dataGenerator(valid_value, count))
 
 
 #2.3 Data Augmentation
