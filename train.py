@@ -73,7 +73,7 @@ valid_x, valid_y = next(dataGenerator(valid_value, count))
 ########################################################################################################################
 # Model definition
 ########################################################################################################################
-def unet(pretrained_weights = None, input_size = (256, 256, 3), NET_SCALING = NET_SCALING):
+def unetModel(pretrained_weights = None, input_size = (256, 256, 3), NET_SCALING = NET_SCALING):
     inputs = layers.Input(input_size)
 
      conv1 = Conv2D(64, 3, activation='relu', padding='same')(inputs)
@@ -122,18 +122,29 @@ def unet(pretrained_weights = None, input_size = (256, 256, 3), NET_SCALING = NE
     model = Model(inputs=inputs, outputs=output)
 
     return model
+detection_model = unetModel()
 
 
-# Train the network
+#3-2. callbacks setting
 ########################################################################################################################
 early_stopping = EarlyStopping(patience=50, verbose=1)
-checkpoint = ModelCheckpoint(filepath='model.hdf5', save_best_only=True, verbose=1)
-csv_logger = CSVLogger('Training log.csv', separator=';',append=True)
-logger = LambdaCallback(on_epoch_end=lambda epoch, logs: f.write(str(epoch) +'\t'
-                                                                 + str(logs['loss']) +'\t'
-                                                                 + str(logs['val_loss']) + '\t'
-                                                                 + '\n'),
-                        on_train_end=lambda logs: f.close())
+checkpoint = ModelCheckpoint(filepath, monitor='val_dice_coef',save_best_only=True, verbose=1)
+
+########################################################################################################################
+# Train the network
+def learning():
+    detection_model.compile(optimizer='adam', loss=dice_p_bce, metrics=[dice_coef])
+    step_count = min(MAX_TRAIN_STEPS, train_df.shape[0]//BATCH_SIZE)
+    aug_gen = generators.create_aug_gen(generators.make_image_gen(train_df))
+    loss_history = [seg_model.fit(aug_gen,
+                                 steps_per_epoch=step_count,
+                                 epochs=MAX_TRAIN_EPOCHS,
+                                 validation_data=(valid_x, valid_y),
+                                 callbacks=callbacks_list,
+                                workers=1 # the generator is not very thread safe
+                                           )]
+    return loss_history
+
 
 history = model.fit_generator(generator=training_generator,
                               steps_per_epoch=250,
